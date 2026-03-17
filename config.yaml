@@ -1,0 +1,22 @@
+name: "Xray VLESS Client"
+version: "1.0.0"
+slug: "xray_vless_client"
+description: "Клиент Xray по VLESS-ссылке (как в Shadowrocket). Поднимает локальный SOCKS5 для обхода блокировок."
+arch:
+  - amd64
+  - aarch64
+startup: services
+boot: auto
+init: false
+advanced: true
+
+ports:
+  "1080/tcp": 1080
+
+options:
+  vless_url: ""
+  socks_port: 1080
+
+schema:
+  vless_url: str
+  socks_port: int?
