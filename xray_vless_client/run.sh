@@ -1,5 +1,8 @@
 #!/usr/bin/with-contenv bashio
 
+ADDON_VERSION="1.0.1"
+bashio::log.info "Xray VLESS Client v${ADDON_VERSION}"
+
 VLESS_URL=$(bashio::config 'vless_url')
 SOCKS_PORT=$(bashio::config 'socks_port')
 CONFIG_PATH="/tmp/xray_config.json"

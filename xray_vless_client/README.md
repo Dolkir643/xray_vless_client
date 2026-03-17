@@ -2,6 +2,8 @@
 
 Аддон Home Assistant OS: клиент Xray по **VLESS**-ссылке (тот же формат, что в Shadowrocket / V2RayN). Поднимает локальный **SOCKS5**-прокси для обхода блокировок.
 
+**Текущая версия: 1.0.1** — см. [CHANGELOG.md](CHANGELOG.md) (исправления для ссылок из Shadowrocket).
+
 ## Зачем
 
 - Вставить вашу рабочую VLESS-ссылку из Shadowrocket — и пустить через неё трафик с HAOS (например, бота Telegram).
