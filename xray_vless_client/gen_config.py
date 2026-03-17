@@ -3,15 +3,29 @@
 Генерирует config.json для Xray из VLESS-ссылки (формат Shadowrocket / стандартный).
 Использование: VLESS_URL='vless://...' SOCKS_PORT=1080 python3 gen_config.py > /path/config.json
 """
+import base64
 import json
 import os
-import re
 import sys
 from urllib.parse import parse_qs, urlparse
 
 
+def _decode_netloc(netloc: str) -> str:
+    """Если netloc в Base64 (Shadowrocket) — декодируем и возвращаем uuid@host:port."""
+    if "@" in netloc:
+        return netloc
+    try:
+        decoded = base64.b64decode(netloc, validate=True).decode("utf-8", errors="replace")
+        # Shadowrocket: "auto:uuid@host:port" или "uuid@host:port"
+        if decoded.startswith("auto:"):
+            decoded = decoded[5:]
+        return decoded
+    except Exception:
+        return netloc
+
+
 def parse_vless_url(url: str) -> dict:
-    """Парсит vless://uuid@host:port?params"""
+    """Парсит vless://uuid@host:port?params или vless://BASE64?params (Shadowrocket)."""
     if not url or not url.strip().startswith("vless://"):
         raise ValueError("Нужна ссылка вида vless://uuid@host:port?params")
 
@@ -19,19 +33,19 @@ def parse_vless_url(url: str) -> dict:
     if parsed.scheme != "vless":
         raise ValueError("Схема должна быть vless://")
 
-    netloc = parsed.netloc
+    netloc = _decode_netloc(parsed.netloc)
     if "@" not in netloc:
-        raise ValueError("Формат: vless://uuid@host:port")
+        raise ValueError("Формат: vless://uuid@host:port или vless://BASE64(...)?params")
     uuid_part, host_port = netloc.rsplit("@", 1)
-    uuid = uuid_part
+    uuid = uuid_part.strip()
     if ":" in host_port:
         host, port_str = host_port.rsplit(":", 1)
         try:
-            port = int(port_str)
+            port = int(port_str.strip())
         except ValueError:
             raise ValueError("Порт должен быть числом")
     else:
-        host = host_port
+        host = host_port.strip()
         port = 443
 
     query = parse_qs(parsed.query or "", keep_blank_values=True)
@@ -39,21 +53,33 @@ def parse_vless_url(url: str) -> dict:
     def q(key: str, default: str = "") -> str:
         return (query.get(key) or [default])[0].strip()
 
+    # Shadowrocket: peer=SNI, tls=1, xtls=2, pbk=..., sid=... → reality/tls
+    sni = q("sni") or q("peer") or host
+    security = q("security", "none").lower()
+    if not security or security == "none":
+        if q("pbk") and q("sid"):
+            security = "reality"
+        elif q("tls") in ("1", "true", "yes") or q("xtls"):
+            security = "tls"
+
+    alpn_raw = q("alpn")
+    alpn = alpn_raw.split(",") if alpn_raw else ["h2", "http/1.1"]
+
     return {
         "address": host,
         "port": port,
         "id": uuid,
         "encryption": "none",
-        "flow": q("flow") or None,
+        "flow": q("flow") or ("xtls-rprx-vision" if security == "reality" else None),
         "type": q("type", "tcp"),
-        "security": q("security", "none"),
-        "sni": q("sni") or host,
+        "security": security,
+        "sni": sni,
         "fp": q("fp", "chrome"),
         "pbk": q("pbk"),
         "sid": q("sid"),
         "host": q("host"),
         "path": q("path", "/"),
-        "alpn": q("alpn", "h2,http/1.1").split(",") if q("alpn") else ["h2", "http/1.1"],
+        "alpn": alpn,
     }
 
 
